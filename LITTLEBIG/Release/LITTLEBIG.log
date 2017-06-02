@@ -1,11 +1,11 @@
 ﻿  Source.cpp
-Source.cpp(39): warning C4200: nonstandard extension used: zero-sized array in struct/union
-  Source.cpp(39): note: This member will be ignored by a defaulted constructor or copy/move assignment operator
+Source.cpp(29): warning C4200: nonstandard extension used: zero-sized array in struct/union
+  Source.cpp(29): note: This member will be ignored by a defaulted constructor or copy/move assignment operator
+Source.cpp(135): warning C4302: 'type cast': truncation from 'const char *' to 'octet'
+Source.cpp(136): warning C4302: 'type cast': truncation from 'const char *' to 'octet'
 LINK : warning LNK4098: defaultlib 'LIBCMTD' conflicts with use of other libs; use /NODEFAULTLIB:library
   Generating code
-  1 of 14 functions ( 7.1%) were compiled, the rest were copied from previous compilation.
-    0 functions were new in current compilation
-    1 functions had inline decision re-evaluated but remain unchanged
+  All 18 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
   Finished generating code
-  LITTLEBIG.vcxproj -> C:\Users\Dead_Bit\Documents\Visual Studio 2015\Projects\LITTLEBIG\Release\LITTLEBIG.exe
-  LITTLEBIG.vcxproj -> C:\Users\Dead_Bit\Documents\Visual Studio 2015\Projects\LITTLEBIG\Release\LITTLEBIG.pdb (Full PDB)
+  LITTLEBIG.vcxproj -> C:\Users\Dead_Bit\Documents\Visual Studio 2015\LITTLEBIG\Release\LITTLEBIG.exe
+  LITTLEBIG.vcxproj -> C:\Users\Dead_Bit\Documents\Visual Studio 2015\LITTLEBIG\Release\LITTLEBIG.pdb (Full PDB)

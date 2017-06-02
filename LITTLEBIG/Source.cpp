@@ -17,34 +17,24 @@
 
 using namespace std;
 
-static size_t brngCTRX_keep();
-static void brngCTRXStart(const octet theta[32], const octet iv[32], const void* X, size_t count, void* state);
-static void brngCTRXStepR(void* buf, size_t count, void* stack);
-
-int usage();
-void generateKey();
-void encryptKey();
-void printKey();
-void printKeyOnConsole();
-void sign();
-void check_sign();
-
 
 // Переменные
+
 typedef struct
 {
-	const octet* X;		/*< дополнительное слово */
-	size_t count;		/*< размер X в октетах */
-	size_t offset;		/*< текущее смещение в X */
-	octet state_ex[];	/*< состояние brngCTR */
-} brng_ctrx_st;
-bign_params params[1] ;
-err_t errorCode=0;
+	octet s[32];		/*< переменная s */
+	octet r[32];		/*< переменная r */
+	octet block[32];	/*< блок выходных данных */
+	size_t reserved;	/*< резерв выходных октетов */
+	octet state_ex[];	/*< [2 beltHash_keep()] хэш-состояния */
+} brng_ctr_st;
+bign_params params[1];
+err_t errorCode = 0;
 octet privkey[64];
 octet pubkey[128];
 octet brng_state[1024];
 octet theta[32];
-octet pwd[8];  // "B194BAC80A08F53B";
+octet pwd[8]; ;
 octet state[1024];
 octet buf[64];
 octet recBuf[192];
@@ -54,6 +44,29 @@ octet oid_der[128];
 size_t oid_len = 0;
 
 
+
+int usage();
+void generateKey();
+void encryptKey();
+void printKey(char*, char*);
+void printKeyOnConsole();
+void sign();
+void check_sign();
+void correct_exit();
+
+static void brngBlockNeg(octet dest[32], const octet src[32]);
+
+static void brngBlockXor2(octet dest[32], const octet src[32]);
+
+static void brngBlockInc(octet block[32]);
+
+size_t brngCTR_keep();
+void brngCTRStart(void* state, const octet key[32], const octet iv[32]);
+void brngCTRStepR(void* buf, size_t count, void* state);
+
+
+
+
 int main(int argc, char* argv[]) {
 
 	// Нет входных параметров
@@ -61,21 +74,27 @@ int main(int argc, char* argv[]) {
 		return usage();
 
 	// Вывод справки
-	if (strCmp(argv[1], "-h") == 0 && argc == 2)
+	if (strCmp(argv[1], "-h") == 0 && 
+		argc == 2)
 		return usage();
 
 	// Выработка открытого и личного ключей, шифрование и вывод в файл
-	if (strCmp(argv[1], "-p") == 0 && argc == 3) {
+	if (strCmp(argv[1], "-p") == 0  && 
+		strCmp(argv[3], "-pub") == 0 &&
+		strCmp(argv[5], "-priv") == 0 &&
+		argc == 7) {
 		memCopy(pwd, argv[2], strLen(argv[2]));
 		generateKey();
 		printKeyOnConsole();
 		encryptKey();
-		printKey();
+		printKey(argv[4], argv[6]);
+		correct_exit();
 		return 0;
 	}
 
 	// Подпись файла
-	if (strCmp(argv[1], "-s") == 0 && argc == 3)
+	if (strCmp(argv[1], "-s") == 0 && 
+		argc == 3)
 	{
 		printf("Generating digital signature...\n");
 		FILE* fp = fopen(argv[2], "r+b");
@@ -85,11 +104,13 @@ int main(int argc, char* argv[]) {
 		hexFrom((char*)recBuf, sig, 96);
 		fwrite(recBuf, sizeof(octet), 192, fp);
 		fclose(fp);
+		correct_exit();
 		return 0;
 	}
 
 	// Проверка ЭЦП
-	if (strCmp(argv[1], "-c") == 0 && argc == 3) {
+	if (strCmp(argv[1], "-c") == 0 && 
+		argc == 3) {
 		printf("Validating digital signature...\n");
 		FILE* fp = fopen(argv[2], "r+b");
 		fseek(fp, 0, SEEK_END);
@@ -102,6 +123,7 @@ int main(int argc, char* argv[]) {
 		generateKey();
 		check_sign();
 		fclose(fp);
+		correct_exit();
 		return 0;
 	}
 
@@ -109,25 +131,25 @@ int main(int argc, char* argv[]) {
 	return usage();
 }
 
+void correct_exit() {
+	memSet(privkey, (octet)"0", 64);
+	memSet(theta, (octet)"0", 32);
+}
 
 void generateKey() {
 	// Загрузка стандартных параметров	
-	errorCode = bignStdParams(params, "1.2.112.0.2.0.34.101.45.3.3"); // Таблица Б1 из СТБ 34.101.45
+	// Updated elliptical curve
+	errorCode = bignStdParams(params, "1.2.112.0.2.0.34.101.45.3.1"); // Таблица Б1 из СТБ 34.101.45
 	if (!errorCode == ERR_OK)
 		printf("Error assuming loading paramethers: %d\n", errorCode);
 
 
 	// Установка ГПСЧ
-	brngCTRXStart(beltH() + 128, beltH() + 128 + 64, beltH(), 8 * 32, brng_state);
+	brngCTRStart(state, beltH() + 128, beltH() + 128 + 64);
 
 
 	// Генерация ключей
-	bignGenKeypair(privkey, pubkey, params, brngCTRXStepR, brng_state);
-
-
-	// Проверка сгенерированного личного ключа
-	if (!hexEq(privkey, "1F66B5B84B7339674533F0329C74F21834281FED0732429E0C79235FC273E269"))
-		printf("Error assuming generated private key!\n");
+	bignGenKeypair(privkey, pubkey, params, brngCTRStepR, brng_state);
 
 
 	// Проверка сгенерированного открытого ключа
@@ -144,7 +166,7 @@ void printKeyOnConsole() {
 			printf("\n");
 		if (i % 2 == 0 && (i != 0 && i != 32))
 			printf(":");
-		if (pubkey[i] < 0x0f)
+		if (pubkey[i] <= 0x0f)
 			printf("0%x", pubkey[i]);
 		else
 			printf("%x", pubkey[i]);
@@ -155,23 +177,30 @@ void printKeyOnConsole() {
 void sign() {
 	oid_len = sizeof(oid_der);
 	bignOidToDER(oid_der, &oid_len, "1.2.112.0.2.0.34.101.31.81");
-	if(bignSign(sig, params, oid_der, oid_len, _hash, privkey, brngCTRXStepR, brng_state)==ERR_OK)
+	if(bignSign(sig, params, oid_der, oid_len, _hash, privkey, brngCTRStepR, brng_state)==ERR_OK)
 		printf("generated successful!\n");
+
 	
 }
 
-void printKey() {
+void printKey(char* pub, char* priv) {
 	// Запись зашфрованного ключа в файл
-	FILE* fp = fopen("private_key.txt", "w+b");
+	FILE* fp = fopen(priv, "w+b");
+	FILE* fz = fopen(pub, "w+b");
 	fwrite(buf, sizeof(octet), strlen((char*)buf), fp);
+	fwrite(pubkey, sizeof(octet), 128, fz);
 	fclose(fp);
+	fclose(fz);
 	printf("\nPrivate key: \n"
-		   "was been encrypted and written to the file private_key.txt\n\n");
+		   "was been encrypted and written to the file %s\n\n", priv);
+	printf("\nPublic key: \n"
+		"was been written to the file %s\n\n", pub);
 }
 
 void encryptKey() {
 	// Построение ключа шифрования theta (beltKWP) файла по паролю pwd
 	beltPBKDF2(theta, (const octet*)pwd, strLen((const char*)pwd), 10000, beltH() + 128 + 64, 8);
+
 
 	// Начало процедуры зашифрования ключа
 	ASSERT(sizeof(state) >= beltKWP_keep());
@@ -182,15 +211,15 @@ void encryptKey() {
 
 int usage() {
 	printf(
-		"------------------------------------------------------------------------------------------------------\n"
+		"------------------------------------------------------------------------------------------------------------------------\n"
 		"This simple utility allow you generate public/private key and \n"
 		"check/generate digital signature of the choosen file.\n"
 		"Usage:\n"
-		"	LITTLEBIG  -p password                          generate private and public key\n"
-		"	LITTLEBIG  -s <file_to_create_signature>        generate digital signature and signing file\n"
-		"	LITTLEBIG  -c <file_to_check_signature>         validating digital signature of file\n"
-		"	LITTLEBIG  -h                                   help\n"
-		"------------------------------------------------------------------------------------------------------\n"
+		"	LITTLEBIG  -p password -pub pubkey_file -priv privatekey_file       generate private and public key\n"
+		"	LITTLEBIG  -s <file_to_create_signature>                            generate digital signature and signing file\n"
+		"	LITTLEBIG  -c <file_to_check_signature>                             validating digital signature of file\n"
+		"	LITTLEBIG  -h                                                       help\n"
+		"------------------------------------------------------------------------------------------------------------------------\n"
 	);
 	return 0;
 }
@@ -199,49 +228,113 @@ void check_sign() {
 	oid_len = sizeof(oid_der);
 	bignOidToDER(oid_der, &oid_len, "1.2.112.0.2.0.34.101.31.81");
 	if (bignVerify(params, oid_der, oid_len, _hash, sig, pubkey) != ERR_OK)
-		printf("Sign is not valid!\n");
+		printf("Sign is'n valid!\n");
 	else
 		printf("Sign is valid!\n");
 }
 
-static size_t brngCTRX_keep()
+static void brngBlockNeg(octet dest[32], const octet src[32])
 {
-	return sizeof(brng_ctrx_st) + brngCTR_keep();
+	register size_t i = W_OF_O(32);
+	while (i--)
+		((word*)dest)[i] = ~((const word*)src)[i];
 }
 
-static void brngCTRXStart(const octet theta[32], const octet iv[32], const void* X, size_t count, void* state)
+static void brngBlockXor2(octet dest[32], const octet src[32])
 {
-	brng_ctrx_st* s = (brng_ctrx_st*)state;
-	ASSERT(memIsValid(s, sizeof(brng_ctrx_st)));
-	ASSERT(count > 0);
-	ASSERT(memIsValid(s->state_ex, brngCTR_keep()));
-	brngCTRStart(s->state_ex, theta, iv);
-	s->X = (const octet*)X;
-	s->count = count;
-	s->offset = 0;
+	register size_t i = W_OF_O(32);
+	while (i--)
+		((word*)dest)[i] ^= ((const word*)src)[i];
 }
 
-static void brngCTRXStepR(void* buf, size_t count, void* stack)
+static void brngBlockInc(octet block[32])
 {
-	brng_ctrx_st* s = (brng_ctrx_st*)stack;
-	octet* buf1 = (octet*)buf;
-	size_t count1 = count;
-	ASSERT(memIsValid(s, sizeof(brng_ctrx_st)));
-	// заполнить buf
-	while (count1)
-		if (count1 < s->count - s->offset)
+	register size_t i = 0;
+	word* w = (word*)block;
+	do
+	{
+#if (OCTET_ORDER == BIG_ENDIAN)
+		w[i] = wordRev(w[i]);
+		++w[i];
+		w[i] = wordRev(w[i]);
+#else
+		++w[i];
+#endif
+	} while (w[i] == 0 && i++ < W_OF_O(32));
+	i = 0;
+}
+
+size_t brngCTR_keep()
+{
+	return sizeof(brng_ctr_st) + 2 * beltHash_keep();
+}
+void brngCTRStart(void* state, const octet key[32], const octet iv[32])
+{
+	brng_ctr_st* s = (brng_ctr_st*)state;
+	ASSERT(memIsDisjoint2(s, brngCTR_keep(), key, 32));
+	ASSERT(iv == 0 || memIsDisjoint2(s, brngCTR_keep(), iv, 32));
+	// обработать key
+	beltHashStart(s->state_ex + beltHash_keep());
+	beltHashStepH(key, 32, s->state_ex + beltHash_keep());
+	//	сохранить iv
+	if (iv)
+		memCopy(s->s, iv, 32);
+	else
+		memSetZero(s->s, 32);
+	//	r <- ~s
+	brngBlockNeg(s->r, s->s);
+	// нет выходных данных
+	s->reserved = 0;
+}
+void brngCTRStepR(void* buf, size_t count, void* state)
+{
+	brng_ctr_st* s = (brng_ctr_st*)state;
+	ASSERT(memIsDisjoint2(buf, count, s, brngCTR_keep()));
+	// есть резерв данных?
+	if (s->reserved)
+	{
+		if (s->reserved >= count)
 		{
-			memCopy(buf1, s->X + s->offset, count1);
-			s->offset += count1;
-			count1 = 0;
+			memCopy(buf, s->block + 32 - s->reserved, count);
+			s->reserved -= count;
+			return;
 		}
-		else
-		{
-			memCopy(buf1, s->X + s->offset, s->count - s->offset);
-			buf1 += s->count - s->offset;
-			count1 -= s->count - s->offset;
-			s->offset = 0;
-		}
-	// сгенерировать
-	brngCTRStepR(buf, count, s->state_ex);
+		memCopy(buf, s->block + 32 - s->reserved, s->reserved);
+		count -= s->reserved;
+		buf = (octet*)buf + s->reserved;
+		s->reserved = 0;
+	}
+	// цикл по полным блокам
+	while (count >= 32)
+	{
+		// Y_t <- belt-hash(key || s || X_t || r)
+		memCopy(s->state_ex, s->state_ex + beltHash_keep(), beltHash_keep());
+		beltHashStepH(s->s, 32, s->state_ex);
+		beltHashStepH(buf, 32, s->state_ex);
+		beltHashStepH(s->r, 32, s->state_ex);
+		beltHashStepG((octet*)buf, s->state_ex);
+		// next
+		brngBlockInc(s->s);
+		brngBlockXor2(s->r, (octet*)buf);
+		buf = (octet*)buf + 32;
+		count -= 32;
+	}
+	// неполный блок?
+	if (count)
+	{
+		// block <- beltHash(key || s || zero_pad(X_t) || r)
+		memSetZero(s->block + count, 32 - count);
+		memCopy(s->state_ex, s->state_ex + beltHash_keep(), beltHash_keep());
+		beltHashStepH(s->s, 32, s->state_ex);
+		beltHashStepH(buf, count, s->state_ex);
+		beltHashStepH(s->block + count, 32 - count, s->state_ex);
+		beltHashStepH(s->r, 32, s->state_ex);
+		beltHashStepG(s->block, s->state_ex);
+		// Y_t <- left(block)
+		memCopy(buf, s->block, count);
+		// next
+		brngBlockInc(s->s);
+		brngBlockXor2(s->r, s->block);
+		s->reserved = 32 - count;
+	}
 }
