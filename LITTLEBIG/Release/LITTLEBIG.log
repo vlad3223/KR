@@ -1,11 +1,11 @@
 ﻿  Source.cpp
-Source.cpp(29): warning C4200: nonstandard extension used: zero-sized array in struct/union
-  Source.cpp(29): note: This member will be ignored by a defaulted constructor or copy/move assignment operator
-Source.cpp(135): warning C4302: 'type cast': truncation from 'const char *' to 'octet'
-Source.cpp(136): warning C4302: 'type cast': truncation from 'const char *' to 'octet'
-LINK : warning LNK4098: defaultlib 'LIBCMTD' conflicts with use of other libs; use /NODEFAULTLIB:library
-  Generating code
+Source.cpp(29): warning C4200: нестандартное расширение: массив нулевого размера в структуре (объединении)
+  Source.cpp(29): note: Этот член будет пропущен конструктором, установленным по умолчанию, или оператором назначения копии или перемещения
+Source.cpp(135): warning C4302: приведение типов: усечение из "const char *" к "octet"
+Source.cpp(136): warning C4302: приведение типов: усечение из "const char *" к "octet"
+LINK : warning LNK4098: библиотека по умолчанию "LIBCMTD" противоречит использованию других библиотек; используйте параметр /NODEFAULTLIB:library
+  Создание кода
   All 18 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
-  Finished generating code
-  LITTLEBIG.vcxproj -> C:\Users\Dead_Bit\Documents\Visual Studio 2015\LITTLEBIG\Release\LITTLEBIG.exe
-  LITTLEBIG.vcxproj -> C:\Users\Dead_Bit\Documents\Visual Studio 2015\LITTLEBIG\Release\LITTLEBIG.pdb (Full PDB)
+  Создание кода завершено
+  LITTLEBIG.vcxproj -> C:\Users\Dead_Bit\Documents\Visual Studio 2017\Projects\LITTLEBIG\Release\LITTLEBIG.exe
+  LITTLEBIG.vcxproj -> C:\Users\Dead_Bit\Documents\Visual Studio 2017\Projects\LITTLEBIG\Release\LITTLEBIG.pdb (Full PDB)

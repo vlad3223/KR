@@ -228,7 +228,7 @@ void check_sign() {
 	oid_len = sizeof(oid_der);
 	bignOidToDER(oid_der, &oid_len, "1.2.112.0.2.0.34.101.31.81");
 	if (bignVerify(params, oid_der, oid_len, _hash, sig, pubkey) != ERR_OK)
-		printf("Sign is'n valid!\n");
+		printf("Sign is not valid!\n");
 	else
 		printf("Sign is valid!\n");
 }
